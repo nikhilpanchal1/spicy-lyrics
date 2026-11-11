@@ -620,6 +620,11 @@ body:not(.SpicyLyrics_StaticBackground)
   transform: translateY(2px);
 }
 
+/* Keep Spotify's fullscreen button available when the lyrics replacement is unmounted. */
+:has(> #SpicyLyrics_FullscreenButton) > button[data-testid="fullscreen-mode-button"] {
+  display: none !important;
+}
+
 /* Our Popup Lyrics button takes the place of Spotify's Miniplayer button. A rule
    rather than a one-off inline style, so a Miniplayer button Spotify re-renders
    or adds back later is hidden as well. */

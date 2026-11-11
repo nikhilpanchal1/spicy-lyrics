@@ -309,6 +309,7 @@ async function main() {
             }
           },
           false,
+          false,
           false
         ),
       },
@@ -325,6 +326,7 @@ async function main() {
               Session.GoBack();
             }
           },
+          false,
           false,
           false
         ),
@@ -376,10 +378,26 @@ async function main() {
     Global.Saves.shift_key_pressed = false;
   });
 
+  let pageContainerAvailable = false;
+
+  const syncLyricsButtons = () => {
+    if (!ButtonList || !pageContainerAvailable) return;
+
+    const isTrack = SpotifyPlayer.GetContentType() === "track";
+    for (const entry of [ButtonList[0], ButtonList[1]]) {
+      if (entry.Registered === isTrack) continue;
+      if (isTrack) {
+        entry.Button.register();
+      } else {
+        entry.Button.deregister();
+      }
+      entry.Registered = isTrack;
+    }
+  };
+
   // Registers or removes the Popup Lyrics button to match the setting, so turning
   // it on or off applies right away instead of after a restart. The body class
   // hides Spotify's Miniplayer button while ours is in use (default.css).
-  let pageContainerAvailable = false;
   const syncPopupLyricsButton = () => {
     const allowed = ('documentPictureInPicture' in window) && $popupLyricsAllowed.get();
     document.body.classList.toggle("SpicyLyrics_PopupLyricsEnabled", allowed);
@@ -395,15 +413,8 @@ async function main() {
   };
 
   Global.Event.listen("pagecontainer:available", () => {
-    if (!ButtonList) return;
     pageContainerAvailable = true;
-    for (const button of ButtonList) {
-      if (button === ButtonList[2]) continue;
-      if (!button.Registered) {
-        if (button.Button) button.Button.register();
-        button.Registered = true;
-      }
-    }
+    syncLyricsButtons();
     syncPopupLyricsButton();
   });
 
@@ -435,7 +446,9 @@ async function main() {
       for (const element of container.children) {
         const testId = element.attributes.getNamedItem("data-testid")?.value;
 
-        const isFullscreen = testId === "fullscreen-mode-button";
+        // The stylesheet hides fullscreen only while the lyrics button is mounted.
+        if (testId === "fullscreen-mode-button") continue;
+
         const isGenericControl =
           testId !== "lyrics-button" &&
           element.classList.contains("control-button") &&
@@ -443,7 +456,7 @@ async function main() {
           !element.classList.contains("main-devicePicker-controlButton");
 
         if (
-          (isFullscreen || isGenericControl) &&
+          isGenericControl &&
           element.id !== "SpicyLyrics_PageButton" &&
           element.id !== "SpicyLyrics_FullscreenButton" &&
           element.id !== "SpicyLyrics_PopupLyricsButton"
@@ -457,25 +470,6 @@ async function main() {
     const controlsContainer = SpotifyPlayer.Playbar.GetControls();
     if (controlsContainer) hideUnwantedButtons(controlsContainer);
   }
-
-  let button: any;
-  if (ButtonList) {
-    button = ButtonList[0];
-  }
-
-  // The page button is offered for tracks only. Applied on every song change,
-  // not just at startup, so switching to an episode hides it again.
-  const syncLyricsButtonRegistration = () => {
-    if (!button) return;
-    const isTrack = SpotifyPlayer.GetContentType() === "track";
-    if (isTrack && !button.Registered) {
-      button.Button.register();
-      button.Registered = true;
-    } else if (!isTrack && button.Registered) {
-      button.Button.deregister();
-      button.Registered = false;
-    }
-  };
 
   const Hometinue = async () => {
     Whentil.When(
@@ -814,7 +808,7 @@ async function main() {
         PageContainer?.classList.remove("episode-content-type");
       }
 
-      syncLyricsButtonRegistration();
+      syncLyricsButtons();
 
       if (PageContainer?.querySelector(".ContentBox .NowBar")) {
         if (Fullscreen.IsOpen) {
@@ -1160,11 +1154,6 @@ async function main() {
       );
     }
   };
-
-  Whentil.When(
-    () => SpotifyPlayer.GetContentType(),
-    () => syncLyricsButtonRegistration()
-  );
 
   initNPVLyrics();
 
